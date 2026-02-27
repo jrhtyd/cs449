@@ -1,214 +1,117 @@
+class SolitaireLogic:
+    def __init__(self):
+        self.board = []
+
+    def get_layout(self, board_type):
+        if board_type == 'english':
+            return self.create_english_board()
+        elif board_type == 'hexagon':
+            return self.create_european_board()
+        else:
+            return self.create_diamond_board()
+
+    def create_english_board(self):
+        board = []
+        for row in range(7):
+            current_row = []
+            for col in range(7):
+                is_corner = (row < 2 or row >= 5) and (col < 2 or col >= 5)
+                if is_corner:
+                    current_row.append(0)
+                elif row == 3 and col == 3:
+                    current_row.append(2) # Empty hole
+                else:
+                    current_row.append(1) # Peg
+            board.append(current_row)
+        return board
+
+    def create_european_board(self):
+        board = []
+        for row in range(7):
+            current_row = []
+            for col in range(7):
+                row_dist = max(0, 2 - row) if row < 2 else max(0, row - 4)
+                col_dist = max(0, 2 - col) if col < 2 else max(0, col - 4)
+                if row_dist + col_dist > 2:
+                    current_row.append(0)
+                elif row == 3 and col == 3:
+                    current_row.append(2)
+                else:
+                    current_row.append(1)
+            board.append(current_row)
+        return board
+
+    def create_diamond_board(self):
+        board = []
+        for row in range(9):
+            current_row = []
+            for col in range(9):
+                distance = abs(row - 4) + abs(col - 4)
+                if distance > 4:
+                    current_row.append(0)
+                elif row == 4 and col == 4:
+                    current_row.append(2)
+                else:
+                    current_row.append(1)
+            board.append(current_row)
+        return board
+
 import tkinter as tk
 from tkinter import ttk
+from solitaire_logic import SolitaireLogic
 
-class SolitaireGame:
-    
-    def __init__(self, start):
-        self.start = start
-        start.title("Solitaire")
-        start.configure(bg='white')
-        self.boardType = tk.StringVar()
-        self.boardType.set('english')
-        self.canvas = None
-        self.cellPegs = []
-        self.createUI()
-        self.board()
+class SolitaireGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Solitaire")
+        self.logic = SolitaireLogic()
+        self.board_type = tk.StringVar(value='english')
+        self.create_ui()
+        self.refresh_board()
 
-    def createUI(self):
-        header = ttk.Label(self.start, text="Solitaire")
-        header.configure(font=('Times New Roman', 16))
-        header.pack()
+    def create_ui(self):
+        # Header [cite: 7]
+        ttk.Label(self.root, text="Solitaire", font=('Times New Roman', 16)).pack()
         
-        mainFrame = ttk.Frame(self.start)
-        mainFrame.pack(fill='both', expand=True)
-        mainFrame.columnconfigure(0, weight=0)
-        mainFrame.columnconfigure(1, weight=1)
-        mainFrame.columnconfigure(2, weight=0)
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill='both', expand=True)
         
-        leftPanel = ttk.LabelFrame(mainFrame, text="Board Type")
-        leftPanel.grid(row=1, column=0)
+        # Left Panel: Board Type [cite: 12, 13]
+        left_panel = ttk.LabelFrame(main_frame, text="Board Type")
+        left_panel.grid(row=0, column=0, padx=10, sticky='n')
         
-        boardTypes = []
-        boardTypes.append(('english', 'English'))
-        boardTypes.append(('hexagon', 'Hexagon'))
-        boardTypes.append(('diamond', 'Diamond'))
-        for value, text in boardTypes:
-            button = ttk.Radiobutton(leftPanel, text=text, variable=self.boardType, value=value)
-            button.configure(command=self.board)
-            button.pack(anchor='w')
+        for val, txt in [('english', 'English'), ('hexagon', 'Hexagon'), ('diamond', 'Diamond')]:
+            ttk.Radiobutton(left_panel, text=txt, variable=self.board_type, 
+                            value=val, command=self.refresh_board).pack(anchor='w')
         
-        self.boardFrame = ttk.Frame(mainFrame)
-        self.boardFrame.grid(row=1, column=1)
-        self.canvasFrame = tk.Frame(self.boardFrame)
-        self.canvasFrame.pack(expand=True)
+        # Center: Board Canvas [cite: 15]
+        self.canvas_frame = tk.Frame(main_frame)
+        self.canvas_frame.grid(row=0, column=1)
         
-        rightPanel = ttk.Frame(mainFrame)
-        rightPanel.grid(row=1, column=2)
-        
-        newGameButton = ttk.Button(rightPanel, text="New Game", width=12)
-        newGameButton.configure(command=self.board)
-        newGameButton.pack()
-        
-        ttk.Separator(rightPanel, orient='horizontal').pack(fill='x')
-        
-        autoplayButton = ttk.Button(rightPanel, text="Autoplay", width=12)
-        autoplayButton.pack()
-        randomizeButton = ttk.Button(rightPanel, text="Randomize", width=12)
-        randomizeButton.pack()
-        
-        ttk.Separator(rightPanel, orient='horizontal').pack(fill='x')
-        
-        replayButton = ttk.Button(rightPanel, text="Replay", width=12)
-        replayButton.pack()
+        # Right Panel: Controls [cite: 14]
+        right_panel = ttk.Frame(main_frame)
+        right_panel.grid(row=0, column=2, padx=10, sticky='n')
+        ttk.Button(right_panel, text="New Game", command=self.refresh_board).pack(pady=5)
 
-    def getLayout(self):
-        selected = self.boardType.get()
-        if selected == 'english':
-            return self.createEnglishBoard()
-        elif selected == 'hexagon':
-            return self.createEuropeanBoard()
-        else:
-            return self.createDiamondBoard()
-
-    def createEnglishBoard(self):
-        board = []
-        
-        row = 0
-        while row < 7:
-            currentRow = []
-            column = 0
-            while column < 7:
-                isCorner = False
-                if row < 2:
-                    if column < 2:
-                        isCorner = True
-                    if column >= 5:
-                        isCorner = True
-                if row >= 5:
-                    if column < 2:
-                        isCorner = True
-                    if column >= 5:
-                        isCorner = True
-                    
-                if isCorner == True:
-                    currentRow.append(0)
-                elif row == 3 and column == 3:
-                    currentRow.append(2)
-                else:
-                    currentRow.append(1)
-                column = column + 1
-            board.append(currentRow)
-            row = row + 1
-        return board
-
-    def createEuropeanBoard(self):
-        board = []
-        
-        row = 0
-        while row < 7:
-            currentRow = []
-            column = 0
-            while column < 7:
-                rowDistance = 0
-                columnDistance = 0
-                
-                if row < 2:
-                    rowDistance = 2 - row
-                elif row >= 5:
-                    rowDistance = row - 4
-                    
-                if column < 2:
-                    columnDistance = 2 - column
-                elif column >= 5:
-                    columnDistance = column - 4
-                
-                if rowDistance + columnDistance > 2:
-                    currentRow.append(0)
-                elif row == 3 and column == 3:
-                    currentRow.append(2)
-                else:
-                    currentRow.append(1)
-                column = column + 1
-            board.append(currentRow)
-            row = row + 1
-        return board
-
-    def createDiamondBoard(self):
-        board = []
-        
-        row = 0
-        while row < 9:
-            currentRow = []
-            column = 0
-            while column < 9:
-                distance = abs(row - 4) + abs(column - 4)
-                
-                if distance > 4:
-                    currentRow.append(0)
-                elif row == 4 and column == 4:
-                    currentRow.append(2)
-                else:
-                    currentRow.append(1)
-                column = column + 1
-            board.append(currentRow)
-            row = row + 1
-        return board
-
-    def board(self):
-        children = self.canvasFrame.winfo_children()
-        for child in children:
+    def refresh_board(self):
+        for child in self.canvas_frame.winfo_children():
             child.destroy()
             
-        board = self.getLayout()
-        gridSize = len(board)
-        cellSize = 20
-        canvasSize = gridSize * cellSize + 10
+        board_data = self.logic.get_layout(self.board_type.get())
+        size = len(board_data)
+        cell_size = 30
+        canvas = tk.Canvas(self.canvas_frame, width=size*cell_size, height=size*cell_size)
+        canvas.pack()
         
-        self.canvas = tk.Canvas(self.canvasFrame, width=canvasSize, height=canvasSize)
-        self.canvas.configure(highlightthickness=0)
-        self.canvas.pack()
-        
-        self.cellPegs = []
-        
-        row = 0
-        while row < gridSize:
-            pegRow = []
-            column = 0
-            while column < gridSize:
-                x1 = column * cellSize + 1
-                y1 = row * cellSize + 1
-                x2 = x1 + cellSize
-                y2 = y1 + cellSize
-                centerX = (x1 + x2) // 2
-                centerY = (y1 + y2) // 2
-                radius = cellSize // 4
-                
-                self.canvas.create_rectangle(x1, y1, x2, y2, width=1)
-                
-                cellState = board[row][column]
-                
-                if cellState == 0:
-                    pegRow.append(None)
-                elif cellState == 1:
-                    peg = self.canvas.create_oval(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
-                    self.canvas.itemconfig(peg, fill='black', outline='black', width=1)
-                    pegRow.append(peg)
-                else:
-                    peg = self.canvas.create_oval(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
-                    self.canvas.itemconfig(peg, fill='white', outline='black', width=1)
-                    pegRow.append(peg)
-                column = column + 1
-            self.cellPegs.append(pegRow)
-            row = row + 1
-
-
-def main():
-    start = tk.Tk()
-    start.geometry("600x500")
-    
-    game = SolitaireGame(start)
-    start.mainloop()
-
+        for r in range(size):
+            for c in range(size):
+                x1, y1 = c * cell_size, r * cell_size
+                if board_data[r][c] > 0:
+                    canvas.create_rectangle(x1, y1, x1+cell_size, y1+cell_size, outline="gray")
+                    color = "black" if board_data[r][c] == 1 else "white"
+                    canvas.create_oval(x1+5, y1+5, x1+cell_size-5, y1+cell_size-5, fill=color)
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = SolitaireGUI(root)
+    root.mainloop()
