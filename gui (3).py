@@ -242,10 +242,19 @@ class SolitaireGame:
         self.boardSize.set('7')
         self.gameMode = tk.StringVar()
         self.gameMode.set('manual')
+        self.recordVar = tk.IntVar()
+        self.recordVar.set(0)
 
         self.game = None
         self.cellPegs = []
         self.autoRunning = False
+        self.replayRunning = False
+        self.replayMoves = []
+        self.replayIndex = 0
+        self.replayBoardType = ''
+        self.replayBoardSize = 0
+        self.replayMode = ''
+        self.recordFile = 'game_record.txt'
 
         self.buildLayout()
         self.newGame()
@@ -270,10 +279,14 @@ class SolitaireGame:
         tk.Radiobutton(self.leftFrame, text="Manual", variable=self.gameMode, value='manual').pack(anchor='w')
         tk.Radiobutton(self.leftFrame, text="Automated", variable=self.gameMode, value='automated').pack(anchor='w')
 
+        tk.Label(self.leftFrame, text="").pack()
+        tk.Checkbutton(self.leftFrame, text="Record game", variable=self.recordVar).pack(anchor='w')
+
         tk.Label(self.rightFrame, text="Board size").pack()
         tk.Entry(self.rightFrame, textvariable=self.boardSize, width=3).pack()
 
         tk.Label(self.rightFrame, text="").pack()
+        tk.Button(self.rightFrame, text="Replay", command=self.replay).pack()
         tk.Button(self.rightFrame, text="New Game", command=self.newGame).pack()
         tk.Button(self.rightFrame, text="Autoplay", command=self.autoplay).pack()
         tk.Button(self.rightFrame, text="Randomize", command=self.randomize).pack()
@@ -284,6 +297,7 @@ class SolitaireGame:
 
     def newGame(self):
         self.autoRunning = False
+        self.replayRunning = False
         try:
             size = int(self.boardSize.get())
         except:
@@ -303,8 +317,76 @@ class SolitaireGame:
         else:
             self.game = AutoGame(bType, size)
 
+        if self.recordVar.get() == 1:
+            f = open(self.recordFile, 'w')
+            f.write(bType + ' ' + str(size) + ' ' + mode + '\n')
+            f.close()
+
         self.drawBoard()
         self.updateStatus()
+
+    def writeMove(self, fromR, fromC, toR, toC, midR, midC):
+        if self.recordVar.get() == 1:
+            f = open(self.recordFile, 'a')
+            f.write(str(fromR) + ' ' + str(fromC) + ' ' + str(toR) + ' ' + str(toC) + ' ' + str(midR) + ' ' + str(midC) + '\n')
+            f.close()
+
+    def replay(self):
+        try:
+            f = open(self.recordFile, 'r')
+            lines = f.readlines()
+            f.close()
+        except:
+            self.statusLabel.config(text="No recorded game found.")
+            return
+
+        if len(lines) == 0:
+            self.statusLabel.config(text="Record file is empty.")
+            return
+
+        parts = lines[0].strip().split()
+        self.replayBoardType = parts[0]
+        self.replayBoardSize = int(parts[1])
+        self.replayMode = parts[2]
+
+        self.replayMoves = []
+        i = 1
+        while i < len(lines):
+            nums = lines[i].strip().split()
+            if len(nums) == 6:
+                move = (int(nums[0]), int(nums[1]), int(nums[2]), int(nums[3]), int(nums[4]), int(nums[5]))
+                self.replayMoves.append(move)
+            i = i + 1
+
+        if self.replayMode == 'manual':
+            self.game = ManualGame(self.replayBoardType, self.replayBoardSize)
+        else:
+            self.game = AutoGame(self.replayBoardType, self.replayBoardSize)
+
+        self.autoRunning = False
+        self.replayRunning = True
+        self.replayIndex = 0
+        self.drawBoard()
+        self.updateStatus()
+        self.statusLabel.config(text="Replaying...")
+        self.start.after(600, self.replayStep)
+
+    def replayStep(self):
+        if not self.replayRunning:
+            return
+        if self.replayIndex >= len(self.replayMoves):
+            self.replayRunning = False
+            if self.game.hasWon():
+                self.statusLabel.config(text="Replay done. You won!")
+            else:
+                self.statusLabel.config(text="Replay done. " + str(self.game.pegCount) + " pegs remaining.")
+            return
+        move = self.replayMoves[self.replayIndex]
+        self.game.makeMove(move[0], move[1], move[2], move[3], move[4], move[5])
+        self.replayIndex = self.replayIndex + 1
+        self.drawBoard()
+        self.updateStatus()
+        self.start.after(600, self.replayStep)
 
     def drawBoard(self):
         for w in self.canvasFrame.winfo_children():
@@ -359,6 +441,8 @@ class SolitaireGame:
             return
         if self.game.isGameOver():
             return
+        if self.replayRunning:
+            return
 
         cellSize = 20
         col = (event.x - 1) // cellSize
@@ -373,7 +457,12 @@ class SolitaireGame:
             if self.game.selectedPeg is not None:
                 self.highlightMoves()
         else:
+            lastMove = self.game.moveCount
             if self.game.tryMove(row, col):
+                h = self.game.moveHistory
+                if len(h) > 0:
+                    m = h[len(h) - 1]
+                    self.writeMove(m[0], m[1], m[2], m[3], m[4], m[5])
                 self.drawBoard()
                 self.updateStatus()
                 if self.game.isGameOver():
@@ -420,6 +509,10 @@ class SolitaireGame:
             self.showGameOver()
             return
         self.game.autoStep()
+        h = self.game.moveHistory
+        if len(h) > 0:
+            m = h[len(h) - 1]
+            self.writeMove(m[0], m[1], m[2], m[3], m[4], m[5])
         self.drawBoard()
         self.updateStatus()
         if self.game.isGameOver():
@@ -430,6 +523,10 @@ class SolitaireGame:
     def randomize(self):
         if isinstance(self.game, ManualGame):
             self.game.randomize()
+            h = self.game.moveHistory
+            if len(h) > 0:
+                m = h[len(h) - 1]
+                self.writeMove(m[0], m[1], m[2], m[3], m[4], m[5])
             self.drawBoard()
             self.updateStatus()
             if self.game.isGameOver():
@@ -458,6 +555,7 @@ class SolitaireGame:
             self.statusLabel.config(text=text)
 
 
-start = tk.Tk()
-game = SolitaireGame(start)
-start.mainloop()
+if __name__ == "__main__":
+    start = tk.Tk()
+    game = SolitaireGame(start)
+    start.mainloop()
