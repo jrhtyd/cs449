@@ -18,17 +18,20 @@ class BoardGame:
         self.moveCount = 0
         self.pegCount = 0
 
-        if self.boardType == 'english':
+        bType = self.boardType.strip().lower()
+        if bType == 'english':
             self.board = self.makeEnglish()
-        elif self.boardType == 'hexagon':
+        elif bType == 'hexagon':
             self.board = self.makeEuropean()
-        elif self.boardType == 'diamond':
+        elif bType == 'diamond':
             self.board = self.makeDiamond()
+        else:
+            self.board = self.makeEnglish()
 
         r = 0
-        while r < self.boardSize:
+        while r < len(self.board):
             c = 0
-            while c < self.boardSize:
+            while c < len(self.board[r]):
                 if self.board[r][c] == 1:
                     self.pegCount = self.pegCount + 1
                 c = c + 1
@@ -345,9 +348,9 @@ class SolitaireGame:
             return
 
         parts = lines[0].strip().split()
-        self.replayBoardType = parts[0]
-        self.replayBoardSize = int(parts[1])
-        self.replayMode = parts[2]
+        self.replayBoardType = parts[0].strip().lower()
+        self.replayBoardSize = int(parts[1].strip())
+        self.replayMode = parts[2].strip().lower() if len(parts) > 2 else 'manual'
 
         self.replayMoves = []
         i = 1
