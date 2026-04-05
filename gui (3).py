@@ -385,8 +385,19 @@ class SolitaireGame:
                 self.statusLabel.config(text="Replay done. " + str(self.game.pegCount) + " pegs remaining.")
             return
         move = self.replayMoves[self.replayIndex]
-        self.game.makeMove(move[0], move[1], move[2], move[3], move[4], move[5])
         self.replayIndex = self.replayIndex + 1
+        size = len(self.game.board)
+        fromR = move[0]
+        fromC = move[1]
+        toR = move[2]
+        toC = move[3]
+        midR = move[4]
+        midC = move[5]
+        allInBounds = (0 <= fromR < size and 0 <= fromC < size and
+                       0 <= toR < size and 0 <= toC < size and
+                       0 <= midR < size and 0 <= midC < size)
+        if allInBounds:
+            self.game.makeMove(fromR, fromC, toR, toC, midR, midC)
         self.drawBoard()
         self.updateStatus()
         self.start.after(600, self.replayStep)
